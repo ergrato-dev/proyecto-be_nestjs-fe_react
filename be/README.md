@@ -8,7 +8,7 @@
     que se ejecuta pero no se comprende.
 -->
 
-> **Tecnologías:** Node.js 24 · NestJS 11 · TypeScript 5 · TypeORM 0.3 · PostgreSQL 17
+> **Tecnologías:** Node.js 20 LTS+ · NestJS 11 · TypeScript 5 · TypeORM 0.3 · PostgreSQL 17
 >
 > Este backend reimplementa **exactamente** el mismo dominio ("NN Auth System") que la
 > edición Express.js del mismo bootcamp (`../../proyecto-be_express-fe_react/be`) —
