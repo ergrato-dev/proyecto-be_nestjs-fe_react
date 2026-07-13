@@ -1,0 +1,130 @@
+# ¿Qué? Workflow de CI que corre lint + build + test de be/ y fe/ en cada push/PR.
+# ¿Para qué? Cerrar el gap documentado en la auditoría del repo hermano Express
+#   ("no hay CI que corra tests/lint/build") — este repo no debe repetirlo.
+# ¿Impacto? Sin esto, un PR con tests rotos o errores de lint podría mergearse sin detección
+#   automática, dependiendo solo de que el aprendiz recuerde correr los checks localmente.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+# ¿Qué? Las actions de terceros se referencian por tag de versión (no SHA pinada).
+# ¿Para qué? El workflow close-prs.yml sí usa SHA pinada (protocolo de seguridad del proyecto,
+#   ver sección 4.0 de copilot-instructions.md) — aquí se usa tag por simplicidad de lectura.
+# ¿Impacto? Antes de un uso serio, reemplazar cada `uses: owner/action@vX` por su SHA
+#   verificada (`gh api repos/<owner>/<action>/git/ref/tags/vX`) siguiendo el mismo protocolo.
+jobs:
+  backend:
+    name: Backend — lint, build, test (Jest)
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: nn_user
+          POSTGRES_PASSWORD: nn_password
+          POSTGRES_DB: nn_auth_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nn_user -d nn_auth_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      # ¿Qué? MailService intenta un SMTP real en cada register/forgot-password (sin mock ni
+      #   try/catch) — sin este servicio los e2e de auth fallarían con ECONNREFUSED en CI.
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://nn_user:nn_password@localhost:5432/nn_auth_db
+      JWT_ACCESS_SECRET: ci-access-secret-min-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-min-32-characters-long
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      MAIL_HOST: localhost
+      MAIL_PORT: 1025
+      MAIL_FROM: noreply@nn-company.com
+      FRONTEND_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: be/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: be
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: be
+        run: pnpm lint
+
+      - name: Build
+        working-directory: be
+        run: pnpm build
+
+      - name: Run migrations
+        working-directory: be
+        run: pnpm typeorm migration:run
+
+      - name: Unit tests
+        working-directory: be
+        run: pnpm test
+
+      - name: E2E tests
+        working-directory: be
+        run: pnpm test:e2e
+
+  frontend:
+    name: Frontend — lint, build, test (Vitest)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: fe/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: fe
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: fe
+        run: pnpm lint
+
+      - name: Build
+        working-directory: fe
+        run: pnpm build
+
+      - name: Test
+        working-directory: fe
+        run: pnpm test

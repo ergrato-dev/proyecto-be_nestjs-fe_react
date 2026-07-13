@@ -1,0 +1,56 @@
+/*
+ * Archivo: index.css
+ * Descripción: Estilos globales del frontend NN Auth System.
+ * ¿Para qué? Importar TailwindCSS e inicializar el design system base del proyecto.
+ * ¿Impacto? Sin @import "tailwindcss" ninguna clase de Tailwind funciona.
+ *   Sin @variant dark no funciona el dark mode basado en clase .dark en <html>.
+ */
+
+/* ¿Qué? Importar TailwindCSS v4 completo. */
+@import 'tailwindcss';
+
+/*
+ * ¿Qué? Configurar dark mode basado en clase en lugar del media query.
+ * ¿Para qué? Permite que el usuario cambie el tema con un toggle independientemente
+ *   de su preferencia del sistema operativo.
+ * ¿Impacto? El ThemeToggle añade/quita la clase .dark en <html>.
+ *   Si usamos solo prefers-color-scheme el usuario no puede controlar el tema.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ¿Qué? Color de marca del proyecto — sistema de identidad visual por stack.
+ * ¿Para qué? Cada proyecto del sistema educativo tiene un color de acento distinto
+ *   para que el alumno identifique visualmente en qué stack está trabajando.
+ *   Cambiar SOLO estas líneas adapta toda la paleta de la aplicación al nuevo stack.
+ * ¿Impacto? Todos los componentes usan `brand-*` en lugar de un color hardcodeado.
+ *   Para cambiar el stack: reemplazar los valores de `var(--color-rose-*)` por
+ *   el color del nuevo stack. Colores asignados:
+ *     blue    → Express.js
+ *     emerald → FastAPI
+ *     violet  → Next.js fullstack
+ *     amber   → Spring Boot Java
+ *     fuchsia → Spring Boot Kotlin
+ *     cyan    → Go REST API
+ *     rose    → NestJS  (este proyecto)
+ */
+@theme {
+  --color-brand-400: var(--color-rose-400);
+  --color-brand-500: var(--color-rose-500);
+  --color-brand-600: var(--color-rose-600);
+  --color-brand-800: var(--color-rose-800);
+}
+
+/*
+ * ¿Qué? Antialiasing global para mejor renderizado de tipografía.
+ * ¿Para qué? Fuentes sans-serif se ven más nítidas en pantallas de alta densidad.
+ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
