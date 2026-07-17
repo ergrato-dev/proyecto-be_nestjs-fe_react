@@ -145,6 +145,7 @@ pnpm outdated
 - Access tokens de corta duración (15 min) para minimizar ventana de exposición
 - Refresh tokens de 7 días con rotación — permiten renovación sin re-autenticación
 - Mensajes de error genéricos en login (no revelan qué campo falló)
+- Comparación de tiempo constante en login (mitiga timing attacks — ver abajo)
 
 ```typescript
 // ✅ Rate limiting en el AuthController con @nestjs/throttler
@@ -152,6 +153,32 @@ pnpm outdated
 @Post('login')
 async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
   return this.authService.login(dto);
+}
+```
+
+**Timing attack en login — el mensaje genérico no es suficiente.**
+
+Si el código busca el usuario y solo llama a `bcrypt.compare` cuando existe
+(`if (!user || !(await bcrypt.compare(...)))`), el branch "usuario no existe"
+responde en microsegundos mientras que "contraseña incorrecta" tarda lo que
+tarda bcrypt (~60-100ms con cost 12). Un atacante puede medir esa diferencia
+con Burp Repeater y enumerar usuarios válidos aunque el mensaje de error sea
+idéntico en ambos casos — el mensaje no es la única señal que existe.
+
+```typescript
+// auth/auth.service.ts — hash fijo sin usuario real detrás
+const DUMMY_PASSWORD_HASH = '$2b$12$...';
+
+const user = await this.usersRepository.findOne({ where: { email: dto.email } });
+
+// ✅ Si el usuario no existe, igual se corre bcrypt contra DUMMY_PASSWORD_HASH —
+//    ambos branches tardan lo mismo, no hay señal de timing que enumerar.
+const isPasswordValid = await bcrypt.compare(
+  dto.password,
+  user?.hashedPassword ?? DUMMY_PASSWORD_HASH,
+);
+if (!user || !isPasswordValid) {
+  throw new UnauthorizedException('Credenciales inválidas.');
 }
 ```
 

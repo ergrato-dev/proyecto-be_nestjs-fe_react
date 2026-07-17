@@ -45,6 +45,13 @@ import { PasswordResetToken } from './entities/password-reset-token.entity';
 import type { TokenPayload } from './interfaces/token-payload.interface';
 
 const BCRYPT_SALT_ROUNDS = 12;
+// ¿Qué? Hash bcrypt fijo (sin usuario real detrás), usado por login() cuando el
+//   email no existe, para comparar contra algo y no saltarse el costo de bcrypt.
+// ¿Para qué? Igualar el tiempo de respuesta del login exista o no el usuario —
+//   el mensaje de error ya es genérico, pero sin esto el timing sigue delatando
+//   qué emails están registrados (OWASP A07).
+const DUMMY_PASSWORD_HASH =
+  '$2b$12$PP42s5XkiNf/2WWHS19shOf.vg.RJnNq7zCJDTCAmQNCrYZdKV85S';
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1h
 
@@ -144,7 +151,13 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.hashedPassword))) {
+    // Si el usuario no existe, igual se corre bcrypt contra DUMMY_PASSWORD_HASH para
+    // no filtrar por timing qué emails están registrados (OWASP A07).
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user?.hashedPassword ?? DUMMY_PASSWORD_HASH,
+    );
+    if (!user || !isPasswordValid) {
       logLoginFailed('Credenciales inválidas', ip);
       throw new UnauthorizedException('Credenciales inválidas.');
     }
