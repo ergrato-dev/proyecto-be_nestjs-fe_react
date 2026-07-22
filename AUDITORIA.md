@@ -12,6 +12,14 @@
 Fecha de la auditoría: 2026-07-13. Repo construido y verificado end-to-end en la misma sesión
 (backend + frontend + docs), antes del primer push a GitHub.
 
+**Re-verificación 2026-07-22** (tras los commits `0fce323`, `1696fa1` y `a85971c` posteriores a la
+auditoría original): re-ejecutado desde cero — `pnpm install`, lint, build, tests y smoke manual
+en ambos, `be/` y `fe/`, contra Postgres 17 + Mailpit reales vía `docker-compose.yml`. Resultado:
+lint limpio, build limpio, 1 test unitario + 43 e2e en verde (`be/`), 67/67 en verde + typecheck
+limpio (`fe/`), y flujo manual real (registro → email en Mailpit → login bloqueado por email no
+verificado → password incorrecto con mensaje genérico) confirmado con `curl`. Sin regresiones
+frente a la auditoría original — los gaps listados abajo siguen siendo los mismos.
+
 ## Pertinencia
 
 Alineado al RAP — tiene 10 HUs y 8 RFs + RNFs en [`docs/requisitos/`](docs/requisitos/) y
@@ -113,6 +121,12 @@ completo y verificado desde el primer merge. ✅
 - Audit log de eventos de seguridad (`common/audit-log.ts`): login success/failed, password
   changed/reset requested, email verified — sin loguear contraseñas ni tokens.
 - `helmet` habilitado (headers CSP/HSTS/X-Frame-Options confirmados en las respuestas reales).
+- Comparación de tiempo constante en `login()` (`be/src/auth/auth.service.ts`): si el usuario no
+  existe, igual se corre `bcrypt.compare` contra un `DUMMY_PASSWORD_HASH` fijo, en vez de
+  saltarse ese costo — evita que el timing de la respuesta delate qué emails están registrados
+  aunque el mensaje de error ya sea genérico (OWASP A07). Agregado post-auditoría en el commit
+  `a85971c`, ver [`docs/conceptos/owasp-top-10.md`](docs/conceptos/owasp-top-10.md) para el
+  detalle del ataque mitigado.
 
 Hallazgos dev-only (mismo patrón que los repos hermanos — advertido, no requiere acción):
 
